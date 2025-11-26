@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monitor de Consumo Eléctrico</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background: #f5f5f5;
+            padding: 10px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+            font-size: clamp(1.5rem, 5vw, 2rem);
+        }
+
+        .status {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #666;
+            font-size: clamp(0.9rem, 2.5vw, 1rem);
+        }
+
+        .info-badge {
+            background: #3498db;
+            color: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            display: inline-block;
+            margin: 10px 0;
+            font-size: 0.9rem;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .tab-btn {
+            flex: 1;
+            min-width: 120px;
+            padding: 12px 20px;
+            background: white;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.3s;
+        }
+
+        .tab-btn.active {
+            background: #3498db;
+            color: white;
+            border-color: #3498db;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+
+        .card h3 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: clamp(0.9rem, 2.5vw, 1.1rem);
+        }
+
+        .value {
+            font-size: clamp(1.8rem, 6vw, 2.5rem);
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+
+        .unit {
+            font-size: clamp(0.8rem, 2vw, 1rem);
+            color: #666;
+        }
+
+        .sub-value {
+            color: #666;
+            margin-top: 10px;
+            font-size: clamp(0.8rem, 2vw, 0.9rem);
+        }
+
+        .charts {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .chart-container {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .chart-container h3 {
+            text-align: center;
+            margin-bottom: 15px;
+            color: #2c3e50;
+            font-size: clamp(1rem, 3vw, 1.2rem);
+        }
+
+        .chart {
+            height: 250px;
+        }
+
+        .search-section {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        .search-section h3 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+        }
+
+        .search-filters {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .filter-group label {
+            color: #555;
+            margin-bottom: 5px;
+            font-size: 0.9rem;
+        }
+
+        .filter-group input,
+        .filter-group select {
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 1rem;
+            width: 100%;
+        }
+
+        .search-btn {
+            width: 100%;
+            padding: 12px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .search-btn:hover {
+            background: #2980b9;
+        }
+
+        .results-container {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-top: 20px;
+        }
+
+        .results-container h3 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+        }
+
+        .result-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            border-left: 4px solid #3498db;
+        }
+
+        .result-item .time {
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 8px;
+        }
+
+        .result-item .data {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            font-size: 0.9rem;
+        }
+
+        .no-results {
+            text-align: center;
+            color: #999;
+            padding: 20px;
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 5px;
+            }
+
+            .dashboard {
+                grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+                gap: 10px;
+            }
+
+            .card {
+                padding: 12px;
+            }
+
+            .value {
+                font-size: 1.8rem;
+            }
+
+            .chart {
+                height: 200px;
+            }
+
+            .search-filters {
+                grid-template-columns: 1fr;
+            }
+
+            .tabs {
+                gap: 5px;
+            }
+
+            .tab-btn {
+                min-width: 100px;
+                padding: 10px 15px;
+                font-size: 0.9rem;
+            }
+        }
+
+        @media (min-width: 769px) {
+            .charts {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>⚡ Monitor de Consumo Eléctrico</h1>
+            <div class="info-badge">📊 Logging automático desde ESP32</div>
+        </div>
+
+        <div class="status">
+            Última actualización: <span id="lastUpdate">--:--:--</span>
+        </div>
+
+        <div class="tabs">
+            <button class="tab-btn active" onclick="showTab('realtime')">Tiempo Real</button>
+            <button class="tab-btn" onclick="showTab('history')">Historial</button>
+        </div>
+
+        <!-- Real-time Tab -->
+        <div id="realtime-tab" class="tab-content active">
+            <div class="dashboard">
+                <div class="card">
+                    <h3>Consumo Eléctrico</h3>
+                    <div class="value" id="currentValue">0.000<span class="unit">A</span></div>
+                    <div class="sub-value">Corriente en tiempo real</div>
+                </div>
+
+                <div class="card">
+                    <h3>Potencia</h3>
+                    <div class="value" id="powerWValue">0<span class="unit">W</span></div>
+                    <div class="sub-value" id="powerKWValue">0.000 kW</div>
+                </div>
+
+                <div class="card">
+                    <h3>Consumo Diario</h3>
+                    <div class="value" id="dailyEnergy">0.000<span class="unit">kWh</span></div>
+                    <div class="sub-value" id="dailyCost">$0.00</div>
+                </div>
+
+                <div class="card">
+                    <h3>Consumo Bimestral</h3>
+                    <div class="value" id="bimonthlyEnergy">0.000<span class="unit">kWh</span></div>
+                    <div class="sub-value" id="bimonthlyCost">$0.00</div>
+                </div>
+            </div>
+
+            <div class="charts">
+                <div class="chart-container">
+                    <h3>Consumo Diario</h3>
+                    <div class="chart">
+                        <canvas id="dailyChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="chart-container">
+                    <h3>Consumo Bimestral</h3>
+                    <div class="chart">
+                        <canvas id="bimonthlyChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- History Tab -->
+        <div id="history-tab" class="tab-content">
+            <div class="search-section">
+                <h3>🔍 Buscar Consumo Histórico</h3>
+                <div class="search-filters">
+                    <div class="filter-group">
+                        <label>Fecha específica:</label>
+                        <input type="date" id="searchDate">
+                    </div>
+                    <div class="filter-group">
+                        <label>Día de la semana:</label>
+                        <select id="searchDay">
+                            <option value="">Todos</option>
+                            <option value="0">Domingo</option>
+                            <option value="1">Lunes</option>
+                            <option value="2">Martes</option>
+                            <option value="3">Miércoles</option>
+                            <option value="4">Jueves</option>
+                            <option value="5">Viernes</option>
+                            <option value="6">Sábado</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Hora específica:</label>
+                        <select id="searchHour">
+                            <option value="">Todas</option>
+                            <option value="0">12:00 AM - 1:00 AM</option>
+                            <option value="1">1:00 AM - 2:00 AM</option>
+                            <option value="2">2:00 AM - 3:00 AM</option>
+                            <option value="3">3:00 AM - 4:00 AM</option>
+                            <option value="4">4:00 AM - 5:00 AM</option>
+                            <option value="5">5:00 AM - 6:00 AM</option>
+                            <option value="6">6:00 AM - 7:00 AM</option>
+                            <option value="7">7:00 AM - 8:00 AM</option>
+                            <option value="8">8:00 AM - 9:00 AM</option>
+                            <option value="9">9:00 AM - 10:00 AM</option>
+                            <option value="10">10:00 AM - 11:00 AM</option>
+                            <option value="11">11:00 AM - 12:00 PM</option>
+                            <option value="12">12:00 PM - 1:00 PM</option>
+                            <option value="13">1:00 PM - 2:00 PM</option>
+                            <option value="14">2:00 PM - 3:00 PM</option>
+                            <option value="15">3:00 PM - 4:00 PM</option>
+                            <option value="16">4:00 PM - 5:00 PM</option>
+                            <option value="17">5:00 PM - 6:00 PM</option>
+                            <option value="18">6:00 PM - 7:00 PM</option>
+                            <option value="19">7:00 PM - 8:00 PM</option>
+                            <option value="20">8:00 PM - 9:00 PM</option>
+                            <option value="21">9:00 PM - 10:00 PM</option>
+                            <option value="22">10:00 PM - 11:00 PM</option>
+                            <option value="23">11:00 PM - 12:00 AM</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Rango de fechas:</label>
+                        <input type="date" id="searchDateFrom" placeholder="Desde">
+                    </div>
+                    <div class="filter-group">
+                        <label>&nbsp;</label>
+                        <input type="date" id="searchDateTo" placeholder="Hasta">
+                    </div>
+                </div>
+                <button class="search-btn" onclick="searchHistory()">🔍 Buscar</button>
+            </div>
+
+            <div class="results-container" id="resultsContainer" style="display: none;">
+                <h3>📊 Resultados</h3>
+                <div id="searchResults"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyCkNxk0LzwjHVEP5Cv6H_cAw-XlPdqSfAo",
+            authDomain: "medidorkw.firebaseapp.com",
+            databaseURL: "https://medidorkw-default-rtdb.firebaseio.com",
+            projectId: "medidorkw",
+            storageBucket: "medidorkw.firebasestorage.app",
+            messagingSenderId: "904836633091",
+            appId: "1:904836633091:web:49b1cd2e3bb65c97ccf436"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        let dailyChart, bimonthlyChart;
+        let dailyData = [], bimonthlyData = [], timeLabels = [];
+
+        function showTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(tabName + '-tab').classList.add('active');
+            event.target.classList.add('active');
+            
+            // ✅ Cargar datos recientes cuando se abre la pestaña de historial
+            if (tabName === 'history') {
+                loadRecentHistory();
+            }
+        }
+
+        function initializeCharts() {
+            const dailyCtx = document.getElementById('dailyChart').getContext('2d');
+            dailyChart = new Chart(dailyCtx, {
+                type: 'line',
+                data: {
+                    labels: timeLabels,
+                    datasets: [{
+                        label: 'kWh',
+                        data: dailyData,
+                        borderColor: '#3498db',
+                        backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: { y: { beginAtZero: true } },
+                    plugins: { legend: { display: false } }
+                }
+            });
+
+            const bimonthlyCtx = document.getElementById('bimonthlyChart').getContext('2d');
+            bimonthlyChart = new Chart(bimonthlyCtx, {
+                type: 'line',
+                data: {
+                    labels: timeLabels,
+                    datasets: [{
+                        label: 'kWh',
+                        data: bimonthlyData,
+                        borderColor: '#e74c3c',
+                        backgroundColor: 'rgba(231, 76, 60, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: { y: { beginAtZero: true } },
+                    plugins: { legend: { display: false } }
+                }
+            });
+        }
+
+        function updateDisplay(data) {
+            if (data.corriente !== undefined) {
+                document.getElementById('currentValue').innerHTML = data.corriente.toFixed(3) + '<span class="unit">A</span>';
+            }
+            if (data.potencia_w !== undefined) {
+                document.getElementById('powerWValue').innerHTML = Math.round(data.potencia_w) + '<span class="unit">W</span>';
+            }
+            if (data.potencia_kw !== undefined) {
+                document.getElementById('powerKWValue').textContent = data.potencia_kw.toFixed(3) + ' kW';
+            }
+            if (data.diario_kwh !== undefined) {
+                document.getElementById('dailyEnergy').innerHTML = data.diario_kwh.toFixed(3) + '<span class="unit">kWh</span>';
+                document.getElementById('dailyCost').textContent = '$' + (data.diario_kwh * 0.80).toFixed(2);
+            }
+            if (data.bimestral_kwh !== undefined) {
+                document.getElementById('bimonthlyEnergy').innerHTML = data.bimestral_kwh.toFixed(3) + '<span class="unit">kWh</span>';
+                document.getElementById('bimonthlyCost').textContent = '$' + (data.bimestral_kwh * 0.80).toFixed(2);
+            }
+
+            const now = new Date();
+            const timeString = now.getHours().toString().padStart(2, '0') + ':' + 
+                             now.getMinutes().toString().padStart(2, '0') + ':' + 
+                             now.getSeconds().toString().padStart(2, '0');
+            document.getElementById('lastUpdate').textContent = timeString;
+
+            if (data.diario_kwh !== undefined || data.bimestral_kwh !== undefined) {
+                timeLabels.push(timeString);
+                if (data.diario_kwh !== undefined) dailyData.push(data.diario_kwh);
+                if (data.bimestral_kwh !== undefined) bimonthlyData.push(data.bimestral_kwh);
+
+                if (timeLabels.length > 15) {
+                    timeLabels.shift();
+                    dailyData.shift();
+                    bimonthlyData.shift();
+                }
+
+                if (dailyChart) dailyChart.update();
+                if (bimonthlyChart) bimonthlyChart.update();
+            }
+        }
+
+        // 🔧 FUNCIÓN NUEVA: Cargar todos los registros recientes al abrir la pestaña
+        function loadRecentHistory() {
+            const resultsContainer = document.getElementById('resultsContainer');
+            const resultsDiv = document.getElementById('searchResults');
+            
+            resultsDiv.innerHTML = '<div class="no-results">🔄 Cargando últimos registros...</div>';
+            resultsContainer.style.display = 'block';
+
+            // ✅ RUTA CORREGIDA - apunta directamente a donde están los datos
+            database.ref('/historial/registros')
+                .orderByKey()
+                .limitToLast(20) // Últimos 20 registros
+                .once('value')
+                .then(snapshot => {
+                    const data = snapshot.val();
+                    if (!data) {
+                        resultsDiv.innerHTML = '<div class="no-results">❌ No hay datos históricos disponibles</div>';
+                        return;
+                    }
+
+                    console.log("📊 Datos crudos obtenidos:", data);
+                    const results = [];
+                    
+                    // Procesar todos los registros
+                    for (let timestamp in data) {
+                        const registro = data[timestamp];
+                        registro.timestamp = timestamp; // Guardar el timestamp original
+                        results.push(registro);
+                    }
+
+                    if (results.length === 0) {
+                        resultsDiv.innerHTML = '<div class="no-results">❌ No se encontraron registros recientes</div>';
+                    } else {
+                        displayResults(results);
+                    }
+                })
+                .catch(error => {
+                    console.error("❌ Error cargando historial reciente:", error);
+                    resultsDiv.innerHTML = '<div class="no-results">❌ Error al cargar datos: ' + error.message + '</div>';
+                });
+        }
+
+        function searchHistory() {
+            const searchDate = document.getElementById('searchDate').value;
+            const searchDay = document.getElementById('searchDay').value;
+            const searchHour = document.getElementById('searchHour').value;
+            const searchDateFrom = document.getElementById('searchDateFrom').value;
+            const searchDateTo = document.getElementById('searchDateTo').value;
+
+            const resultsContainer = document.getElementById('resultsContainer');
+            const resultsDiv = document.getElementById('searchResults');
+            
+            resultsDiv.innerHTML = '<div class="no-results">🔍 Buscando en base de datos...</div>';
+            resultsContainer.style.display = 'block';
+
+            // CONSULTA CORREGIDA - va directamente a la ruta correcta
+            performSearch(searchDate, searchDay, searchHour, searchDateFrom, searchDateTo);
+        }
+
+        function performSearch(searchDate, dayFilter, hourFilter, dateFrom, dateTo) {
+            const resultsDiv = document.getElementById('searchResults');
+            
+            // ✅ RUTA CORREGIDA - apunta directamente a donde están los datos
+            database.ref('/historial/registros').once('value')
+                .then(snapshot => {
+                    const data = snapshot.val();
+                    if (!data) {
+                        resultsDiv.innerHTML = '<div class="no-results">❌ No se encontraron datos históricos en la base de datos</div>';
+                        return;
+                    }
+
+                    console.log("📊 Datos crudos obtenidos:", data);
+                    const results = [];
+                    
+                    // Procesar todos los registros
+                    for (let timestamp in data) {
+                        const registro = data[timestamp];
+                        registro.timestamp = timestamp; // Guardar el timestamp original
+                        
+                        // Aplicar filtros
+                        if (applyFilters(registro, searchDate, dayFilter, hourFilter, dateFrom, dateTo)) {
+                            results.push(registro);
+                        }
+                    }
+
+                    if (results.length === 0) {
+                        resultsDiv.innerHTML = '<div class="no-results">❌ No hay registros que coincidan con los filtros aplicados</div>';
+                    } else {
+                        displayResults(results);
+                    }
+                })
+                .catch(error => {
+                    console.error("❌ Error buscando datos:", error);
+                    resultsDiv.innerHTML = '<div class="no-results">❌ Error al conectar con la base de datos: ' + error.message + '</div>';
+                });
+        }
+
+        function applyFilters(registro, searchDate, dayFilter, hourFilter, dateFrom, dateTo) {
+            // Filtro por fecha específica
+            if (searchDate && registro.fecha !== searchDate) {
+                return false;
+            }
+            
+            // Filtro por día de la semana
+            if (dayFilter !== '' && registro.dia_semana != dayFilter) {
+                return false;
+            }
+            
+            // Filtro por hora
+            if (hourFilter !== '' && registro.hora) {
+                const registroHora = parseInt(registro.hora.split(':')[0]);
+                if (registroHora != hourFilter) {
+                    return false;
+                }
+            }
+            
+            // Filtro por rango de fechas
+            if (dateFrom && dateTo) {
+                if (registro.fecha < dateFrom || registro.fecha > dateTo) {
+                    return false;
+                }
+            }
+            
+            return true;
+        }
+
+        function displayResults(results) {
+            const resultsDiv = document.getElementById('searchResults');
+            const days = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+            
+            // Ordenar por timestamp (más recientes primero)
+            results.sort((a, b) => b.timestamp - a.timestamp);
+            
+            let html = '';
+            
+            if (results.length > 0) {
+                html += `<div class="no-results" style="background: #e8f5e8; color: #2d5016; padding: 10px; border-radius: 5px; margin-bottom: 15px;">
+                            ✅ Se encontraron <strong>${results.length}</strong> registros
+                         </div>`;
+            }
+            
+            results.forEach(result => {
+                const dateStr = result.fecha || 'Fecha desconocida';
+                const timeStr = result.hora || 'Hora desconocida';
+                const dayName = result.dia_semana !== undefined ? days[result.dia_semana] : '';
+                
+                html += `
+                    <div class="result-item">
+                        <div class="time">📅 ${dayName ? dayName + ', ' : ''}${dateStr} - 🕒 ${timeStr}</div>
+                        <div class="data">
+                            <div>⚡ Corriente: <strong>${(result.corriente || 0).toFixed(3)} A</strong></div>
+                            <div>💡 Potencia: <strong>${Math.round(result.potencia_w || 0)} W</strong></div>
+                            <div>📊 Energía: <strong>${(result.potencia_kw || 0).toFixed(3)} kW</strong></div>
+                            <div>📈 Consumo Diario: <strong>${(result.diario_kwh || 0).toFixed(3)} kWh</strong></div>
+                            <div>📉 Consumo Bimestral: <strong>${(result.bimestral_kwh || 0).toFixed(3)} kWh</strong></div>
+                        </div>
+                        <div style="font-size: 0.8rem; color: #888; margin-top: 8px;">
+                            🔗 ID: ${result.timestamp}
+                        </div>
+                    </div>
+                `;
+            });
+            
+            resultsDiv.innerHTML = html;
+        }
+
+        function setupFirebaseListeners() {
+            database.ref('/datos').on('value', (snapshot) => {
+                const data = snapshot.val();
+                if (data) {
+                    updateDisplay({
+                        corriente: data.corriente || 0,
+                        potencia_w: data.potencia_w || 0,
+                        potencia_kw: data.potencia_kw || 0
+                    });
+                }
+            });
+
+            database.ref('/energia').on('value', (snapshot) => {
+                const data = snapshot.val();
+                if (data) {
+                    updateDisplay({
+                        diario_kwh: data.diario_kwh || 0,
+                        bimestral_kwh: data.bimestral_kwh || 0
+                    });
+                }
+            });
+        }
+
+        window.addEventListener('load', () => {
+            initializeCharts();
+            setupFirebaseListeners();
+            updateDisplay({ corriente: 0, potencia_w: 0, potencia_kw: 0, diario_kwh: 0, bimestral_kwh: 0 });
+            
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('searchDate').value = today;
+        });
+
+        // 🔧 FUNCIÓN DE DIAGNÓSTICO - verifica qué datos existen (opcional)
+        function diagnosticarFirebase() {
+            console.log("🔍 Iniciando diagnóstico de Firebase...");
+            
+            // Verificar datos en tiempo real
+            database.ref('/datos').once('value').then(snap => {
+                console.log("📊 Datos en tiempo real:", snap.val());
+            });
+            
+            // Verificar estructura de historial
+            database.ref('/historial').once('value').then(snap => {
+                console.log("📈 Estructura de historial:", snap.val());
+            });
+            
+            // Verificar registros específicos
+            database.ref('/historial/registros').limitToFirst(3).once('value').then(snap => {
+                console.log("🔎 Primeros 3 registros:", snap.val());
+            });
+        }
+
+        // Para ejecutar diagnóstico, descomenta la línea siguiente:
+        // window.addEventListener('load', diagnosticarFirebase);
+    </script>
+</body>
+</html>
